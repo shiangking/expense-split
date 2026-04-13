@@ -3,11 +3,15 @@ import { THEMES, type ThemeKey } from "./themes";
 import type { ExpenseForm, PersistedState, TabId } from "./types";
 import { computeBalances, computeSettlements } from "./lib/balances";
 import { calendarToday, isValidISODate } from "./lib/dates";
-import { loadPersisted, savePersisted } from "./lib/persist";
+import { defaultState, loadPersisted, savePersisted } from "./lib/persist";
+import { getSupabase, isSupabaseConfigured } from "./lib/supabase";
+import { rpcCreateSharedTrip } from "./lib/sharedTripRemote";
+import { readTripIdFromLocation, writeTripIdToUrl } from "./lib/tripUrl";
 import { totalPaidByPayer } from "./lib/totals";
-import { useSupabaseTripSync } from "./hooks/useSupabaseTripSync";
+import { useSharedTripSync } from "./hooks/useSharedTripSync";
 import { ThemePicker } from "./components/ThemePicker";
-import { SyncBar } from "./components/SyncBar";
+import { TripShareBar } from "./components/TripShareBar";
+import { TripLanding } from "./components/TripLanding";
 import { MembersTab } from "./components/MembersTab";
 import { ExpensesTab } from "./components/ExpensesTab";
 import { SettleTab } from "./components/SettleTab";
@@ -29,18 +33,25 @@ const emptyForm = (paidBy = "", splitWith: string[] = []): ExpenseForm => ({
 });
 
 export default function App() {
-  const [data, setData] = useState<PersistedState>(loadPersisted);
+  const sharedMode = isSupabaseConfigured();
+  const initialTripId = sharedMode ? readTripIdFromLocation() : null;
+
+  const [tripId, setTripId] = useState<string | null>(initialTripId);
+  const [data, setData] = useState<PersistedState>(() => loadPersisted(initialTripId, sharedMode));
   const [nameInput, setNameInput] = useState("");
   const [form, setForm] = useState<ExpenseForm>(() => emptyForm());
+  const [landingBusy, setLandingBusy] = useState(false);
+  const [landingErr, setLandingErr] = useState<string | null>(null);
 
-  const cloud = useSupabaseTripSync(data, setData);
+  const sync = useSharedTripSync(sharedMode ? tripId : null, data, setData);
 
   const { themeKey, tab, members, expenses, settledIds, trackExpenseDates } = data;
   const T = THEMES[themeKey];
 
   useEffect(() => {
-    savePersisted(data);
-  }, [data]);
+    if (sharedMode && !tripId) return;
+    savePersisted(data, tripId, sharedMode);
+  }, [data, tripId, sharedMode]);
 
   useEffect(() => {
     document.documentElement.style.setProperty("--app-bg", T.bg);
@@ -72,6 +83,36 @@ export default function App() {
   const handleThemeChange = (key: ThemeKey) => {
     setData((d) => ({ ...d, themeKey: key }));
     setForm((f) => ({ ...f, category: "" }));
+  };
+
+  const handleCreateTrip = async () => {
+    setLandingErr(null);
+    setLandingBusy(true);
+    try {
+      const supabase = getSupabase();
+      const id = await rpcCreateSharedTrip(supabase);
+      writeTripIdToUrl(id);
+      setTripId(id);
+      setData(loadPersisted(id, true));
+    } catch (e) {
+      setLandingErr(e instanceof Error ? e.message : "Could not create a trip.");
+    } finally {
+      setLandingBusy(false);
+    }
+  };
+
+  const handleJoinTrip = (id: string) => {
+    setLandingErr(null);
+    writeTripIdToUrl(id);
+    setData(loadPersisted(id, true));
+    setTripId(id);
+  };
+
+  const handleLeaveTrip = () => {
+    writeTripIdToUrl(null);
+    setTripId(null);
+    setData({ ...defaultState });
+    setLandingErr(null);
   };
 
   const addMember = () => {
@@ -141,6 +182,35 @@ export default function App() {
     }));
   };
 
+  if (sharedMode && !tripId) {
+    return (
+      <div
+        style={{
+          minHeight: "100dvh",
+          fontFamily: "var(--font-sans)",
+          background: THEMES.japan.gradient,
+          padding: "1rem",
+        }}
+      >
+        <div style={{ maxWidth: 540, margin: "0 auto" }}>
+          <h1
+            style={{
+              fontSize: 11,
+              color: "var(--color-text-tertiary)",
+              letterSpacing: 2,
+              textTransform: "uppercase",
+              margin: "1rem 0 0",
+              fontWeight: 600,
+            }}
+          >
+            Expense Splitter
+          </h1>
+        </div>
+        <TripLanding T={THEMES.japan} onCreateTrip={handleCreateTrip} onJoinTrip={handleJoinTrip} busy={landingBusy} error={landingErr} />
+      </div>
+    );
+  }
+
   return (
     <div
       style={{
@@ -185,7 +255,7 @@ export default function App() {
         <ThemePicker current={themeKey} onChange={handleThemeChange} accent={T.accent} />
       </div>
 
-      <SyncBar T={T} cloud={cloud} />
+      {sharedMode && tripId && <TripShareBar T={T} tripId={tripId} sync={sync} onLeaveTrip={handleLeaveTrip} />}
 
       {(members.length > 0 || expenses.length > 0) && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 22 }}>

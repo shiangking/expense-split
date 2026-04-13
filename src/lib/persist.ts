@@ -67,20 +67,31 @@ export function parsePersistedStateFromJson(raw: unknown): PersistedState | null
   return { v: 1, themeKey, tab, members, expenses, settledIds, trackExpenseDates };
 }
 
-export function loadPersisted(): PersistedState {
+/** localStorage key: legacy single-device, or per-trip when cloud invite mode is on. */
+export function storageKey(tripId: string | null, sharedMode: boolean): string {
+  if (!sharedMode) return STORAGE_KEY;
+  if (!tripId) return `${STORAGE_KEY}--no-trip`;
+  return `${STORAGE_KEY}--trip--${tripId}`;
+}
+
+export function loadPersisted(tripId: string | null, sharedMode: boolean): PersistedState {
+  if (sharedMode && !tripId) return { ...defaultState };
+  const key = storageKey(tripId, sharedMode);
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return defaultState;
+    const raw = localStorage.getItem(key);
+    if (!raw) return { ...defaultState };
     const parsed = JSON.parse(raw) as unknown;
-    return parsePersistedStateFromJson(parsed) ?? defaultState;
+    return parsePersistedStateFromJson(parsed) ?? { ...defaultState };
   } catch {
-    return defaultState;
+    return { ...defaultState };
   }
 }
 
-export function savePersisted(state: PersistedState): void {
+export function savePersisted(state: PersistedState, tripId: string | null, sharedMode: boolean): void {
+  if (sharedMode && !tripId) return;
+  const key = storageKey(tripId, sharedMode);
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    localStorage.setItem(key, JSON.stringify(state));
   } catch {
     /* ignore */
   }
