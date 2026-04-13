@@ -1,0 +1,17 @@
+{
+  "name": "Expense Split — Travel",
+  "short_name": "Expense Split",
+  "description": "Split travel expenses and settle up with themed country presets.",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#fff5f7",
+  "theme_color": "#c0395a",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

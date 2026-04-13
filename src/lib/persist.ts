@@ -1,0 +1,69 @@
+import { THEMES, type ThemeKey } from "../themes";
+import type { Expense, PersistedState, TabId } from "../types";
+
+const STORAGE_KEY = "expense-split-v1";
+
+const defaultState: PersistedState = {
+  v: 1,
+  themeKey: "japan",
+  tab: "members",
+  members: [],
+  expenses: [],
+  settledIds: [],
+};
+
+function isThemeKey(k: string): k is ThemeKey {
+  return k in THEMES;
+}
+
+function isTabId(k: string): k is TabId {
+  return k === "members" || k === "expenses" || k === "settle";
+}
+
+function sanitizeExpense(raw: unknown): Expense | null {
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  const id = typeof o.id === "number" ? o.id : Number(o.id);
+  const desc = typeof o.desc === "string" ? o.desc : "";
+  const amount = typeof o.amount === "number" ? o.amount : Number(o.amount);
+  const paidBy = typeof o.paidBy === "string" ? o.paidBy : "";
+  const category = typeof o.category === "string" ? o.category : "";
+  const theme = typeof o.theme === "string" && isThemeKey(o.theme) ? o.theme : "usa";
+  const splitWith = Array.isArray(o.splitWith) ? o.splitWith.filter((x): x is string => typeof x === "string") : [];
+  if (!Number.isFinite(id) || !desc.trim() || !Number.isFinite(amount) || amount <= 0 || !paidBy || splitWith.length === 0) {
+    return null;
+  }
+  return { id, desc: desc.trim(), amount, paidBy, category, splitWith, theme };
+}
+
+export function loadPersisted(): PersistedState {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return defaultState;
+    const parsed = JSON.parse(raw) as Partial<PersistedState>;
+    if (parsed.v !== 1) return defaultState;
+    const themeKey = typeof parsed.themeKey === "string" && isThemeKey(parsed.themeKey) ? parsed.themeKey : defaultState.themeKey;
+    const tab = typeof parsed.tab === "string" && isTabId(parsed.tab) ? parsed.tab : defaultState.tab;
+    const members = Array.isArray(parsed.members)
+      ? [...new Set(parsed.members.filter((m): m is string => typeof m === "string" && m.trim().length > 0).map((m) => m.trim()))]
+      : [];
+    const expensesRaw = Array.isArray(parsed.expenses) ? parsed.expenses : [];
+    const expenses = expensesRaw.map(sanitizeExpense).filter((e): e is Expense => e !== null);
+    const settledIds = Array.isArray(parsed.settledIds)
+      ? parsed.settledIds.filter((x): x is string => typeof x === "string")
+      : [];
+    return { v: 1, themeKey, tab, members, expenses, settledIds };
+  } catch {
+    return defaultState;
+  }
+}
+
+export function savePersisted(state: PersistedState): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch {
+    /* ignore */
+  }
+}
+
+export { STORAGE_KEY, defaultState };
