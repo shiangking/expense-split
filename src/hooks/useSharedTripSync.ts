@@ -15,13 +15,18 @@ export type SharedTripSync = {
   ready: boolean;
 };
 
+/** Keep this device's tab + theme; only trip fields come from the server. */
+function withLocalChrome(prev: PersistedState, trip: PersistedState): PersistedState {
+  return { ...trip, tab: prev.tab, themeKey: prev.themeKey };
+}
+
 function mergeInitialPull(local: PersistedState, remote: PersistedState): PersistedState {
   const localHas = local.members.length > 0 || local.expenses.length > 0;
   const remoteHas = remote.members.length > 0 || remote.expenses.length > 0;
-  if (remoteHas && !localHas) return remote;
+  if (remoteHas && !localHas) return withLocalChrome(local, remote);
   if (!remoteHas && localHas) return local;
-  if (remoteHas && localHas) return remote;
-  return remote;
+  if (remoteHas && localHas) return withLocalChrome(local, remote);
+  return withLocalChrome(local, remote);
 }
 
 export function useSharedTripSync(
@@ -138,7 +143,7 @@ export function useSharedTripSync(
         }
         lastRemoteUpdatedAtRef.current = row.updated_at;
         ignoreRemoteUntilRef.current = Date.now() + IGNORE_REMOTE_MS;
-        setData(parsed);
+        setData((prev) => ({ ...parsed, tab: prev.tab, themeKey: prev.themeKey }));
       } catch {
         /* ignore poll errors */
       }
