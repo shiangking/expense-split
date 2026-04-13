@@ -1,42 +1,44 @@
 import { THEMES, THEME_KEYS, type ThemeKey } from "../themes";
 
-type Props = { current: ThemeKey; onChange: (key: ThemeKey) => void };
+type Props = { current: ThemeKey; onChange: (key: ThemeKey) => void; accent: string };
 
-export function ThemePicker({ current, onChange }: Props) {
+export function ThemePicker({ current, onChange, accent }: Props) {
   return (
-    <div
-      role="group"
-      aria-label="Trip theme"
-      style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 24 }}
-    >
-      {THEME_KEYS.map((key) => {
-        const t = THEMES[key];
-        const selected = current === key;
-        return (
-          <button
-            key={key}
-            type="button"
-            onClick={() => onChange(key)}
-            aria-pressed={selected}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              padding: "6px 14px",
-              borderRadius: 20,
-              border: selected ? `2px solid ${t.accent}` : "1.5px solid var(--color-border-tertiary)",
-              background: selected ? `${t.accent}18` : "var(--color-background-secondary)",
-              color: selected ? t.accent : "var(--color-text-secondary)",
-              fontWeight: selected ? 600 : 400,
-              fontSize: 13,
-              cursor: "pointer",
-            }}
-          >
-            <span aria-hidden>{t.flag}</span>
-            <span>{t.name}</span>
-          </button>
-        );
-      })}
-    </div>
+    <label style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 168, flexShrink: 0 }}>
+      <span
+        style={{
+          fontSize: 11,
+          color: "var(--color-text-tertiary)",
+          letterSpacing: 1,
+          textTransform: "uppercase",
+          fontWeight: 500,
+        }}
+      >
+        Trip theme
+      </span>
+      <select
+        value={current}
+        onChange={(e) => onChange(e.target.value as ThemeKey)}
+        aria-label="Trip theme"
+        style={{
+          padding: "8px 10px",
+          borderRadius: 8,
+          border: `0.5px solid ${accent}45`,
+          fontSize: 14,
+          background: "var(--color-background-primary)",
+          color: "var(--color-text-primary)",
+          cursor: "pointer",
+        }}
+      >
+        {THEME_KEYS.map((key) => {
+          const t = THEMES[key];
+          return (
+            <option key={key} value={key}>
+              {t.flag} {t.name}
+            </option>
+          );
+        })}
+      </select>
+    </label>
   );
 }

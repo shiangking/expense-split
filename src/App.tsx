@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { THEMES, type ThemeKey } from "./themes";
 import type { ExpenseForm, PersistedState, TabId } from "./types";
 import { computeBalances, computeSettlements } from "./lib/balances";
+import { calendarToday, isValidISODate } from "./lib/dates";
 import { loadPersisted, savePersisted } from "./lib/persist";
+import { totalPaidByPayer } from "./lib/totals";
 import { ThemePicker } from "./components/ThemePicker";
 import { MembersTab } from "./components/MembersTab";
 import { ExpensesTab } from "./components/ExpensesTab";
@@ -21,6 +23,7 @@ const emptyForm = (paidBy = "", splitWith: string[] = []): ExpenseForm => ({
   paidBy,
   category: "",
   splitWith,
+  expenseDate: calendarToday(),
 });
 
 export default function App() {
@@ -28,7 +31,7 @@ export default function App() {
   const [nameInput, setNameInput] = useState("");
   const [form, setForm] = useState<ExpenseForm>(() => emptyForm());
 
-  const { themeKey, tab, members, expenses, settledIds } = data;
+  const { themeKey, tab, members, expenses, settledIds, trackExpenseDates } = data;
   const T = THEMES[themeKey];
 
   useEffect(() => {
@@ -44,6 +47,7 @@ export default function App() {
 
   const balances = useMemo(() => computeBalances(members, expenses), [expenses, members]);
   const settlements = useMemo(() => computeSettlements(balances), [balances]);
+  const totalPaidByMember = useMemo(() => totalPaidByPayer(members, expenses), [expenses, members]);
 
   const settlementSignature = useMemo(
     () => settlements.map((s) => `${s.id}:${s.amount.toFixed(2)}`).join("|"),
@@ -103,16 +107,22 @@ export default function App() {
   const addExpense = () => {
     const amt = parseFloat(form.amount);
     if (!form.desc.trim() || Number.isNaN(amt) || amt <= 0 || !form.paidBy || form.splitWith.length === 0) return;
-    const entry = {
-      desc: form.desc.trim(),
-      amount: amt,
-      paidBy: form.paidBy,
-      category: form.category,
-      splitWith: [...form.splitWith],
-      id: Date.now(),
-      theme: themeKey,
-    };
-    setData((d) => ({ ...d, expenses: [...d.expenses, entry] }));
+    setData((d) => ({
+      ...d,
+      expenses: [
+        ...d.expenses,
+        {
+          desc: form.desc.trim(),
+          amount: amt,
+          paidBy: form.paidBy,
+          category: form.category,
+          splitWith: [...form.splitWith],
+          id: Date.now(),
+          theme: themeKey,
+          ...(trackExpenseDates && isValidISODate(form.expenseDate) ? { date: form.expenseDate } : {}),
+        },
+      ],
+    }));
     setForm(emptyForm(form.paidBy, form.splitWith));
   };
 
@@ -138,26 +148,38 @@ export default function App() {
         minHeight: "100dvh",
       }}
     >
-      <h1
+      <div
         style={{
-          fontSize: 11,
-          color: "var(--color-text-tertiary)",
-          letterSpacing: 2,
-          textTransform: "uppercase",
-          margin: "0 0 4px",
-          fontWeight: 600,
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-end",
+          gap: 16,
+          marginBottom: 20,
+          flexWrap: "wrap",
         }}
       >
-        Expense Splitter
-      </h1>
-      <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 20, flexWrap: "wrap" }}>
-        <span style={{ fontSize: 26, fontWeight: 500, color: T.accent, fontFamily: T.font }}>{T.subtitle}</span>
-        <span style={{ fontSize: 14, color: "var(--color-text-secondary)" }}>
-          {T.flag} {T.label}
-        </span>
+        <div style={{ flex: "1 1 200px", minWidth: 0 }}>
+          <h1
+            style={{
+              fontSize: 11,
+              color: "var(--color-text-tertiary)",
+              letterSpacing: 2,
+              textTransform: "uppercase",
+              margin: "0 0 4px",
+              fontWeight: 600,
+            }}
+          >
+            Expense Splitter
+          </h1>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 26, fontWeight: 500, color: T.accent, fontFamily: T.font }}>{T.subtitle}</span>
+            <span style={{ fontSize: 14, color: "var(--color-text-secondary)" }}>
+              {T.flag} {T.label}
+            </span>
+          </div>
+        </div>
+        <ThemePicker current={themeKey} onChange={handleThemeChange} accent={T.accent} />
       </div>
-
-      <ThemePicker current={themeKey} onChange={handleThemeChange} />
 
       {(members.length > 0 || expenses.length > 0) && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 22 }}>
@@ -233,7 +255,7 @@ export default function App() {
               members={members}
               nameInput={nameInput}
               setNameInput={setNameInput}
-              balances={balances}
+              totalPaidByMember={totalPaidByMember}
               onAdd={addMember}
               onRemove={removeMember}
             />
@@ -249,6 +271,8 @@ export default function App() {
               onRemoveExpense={removeExpense}
               toggleSplit={toggleSplit}
               selectAllSplit={() => setForm((f) => ({ ...f, splitWith: [...members] }))}
+              trackExpenseDates={trackExpenseDates}
+              onTrackExpenseDatesChange={(value) => setData((d) => ({ ...d, trackExpenseDates: value }))}
             />
           )}
           {tab === t && t === "settle" && (

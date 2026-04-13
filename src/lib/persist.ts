@@ -10,7 +10,17 @@ const defaultState: PersistedState = {
   members: [],
   expenses: [],
   settledIds: [],
+  trackExpenseDates: false,
 };
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+function parseOptionalDate(raw: unknown): string | undefined {
+  if (typeof raw !== "string" || !ISO_DATE.test(raw)) return undefined;
+  const t = Date.parse(`${raw}T12:00:00`);
+  if (Number.isNaN(t)) return undefined;
+  return raw;
+}
 
 function isThemeKey(k: string): k is ThemeKey {
   return k in THEMES;
@@ -33,7 +43,9 @@ function sanitizeExpense(raw: unknown): Expense | null {
   if (!Number.isFinite(id) || !desc.trim() || !Number.isFinite(amount) || amount <= 0 || !paidBy || splitWith.length === 0) {
     return null;
   }
-  return { id, desc: desc.trim(), amount, paidBy, category, splitWith, theme };
+  const date = parseOptionalDate(o.date);
+  const base = { id, desc: desc.trim(), amount, paidBy, category, splitWith, theme };
+  return date ? { ...base, date } : base;
 }
 
 export function loadPersisted(): PersistedState {
@@ -52,7 +64,8 @@ export function loadPersisted(): PersistedState {
     const settledIds = Array.isArray(parsed.settledIds)
       ? parsed.settledIds.filter((x): x is string => typeof x === "string")
       : [];
-    return { v: 1, themeKey, tab, members, expenses, settledIds };
+    const trackExpenseDates = typeof parsed.trackExpenseDates === "boolean" ? parsed.trackExpenseDates : false;
+    return { v: 1, themeKey, tab, members, expenses, settledIds, trackExpenseDates };
   } catch {
     return defaultState;
   }

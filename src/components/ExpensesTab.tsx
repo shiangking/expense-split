@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import type { Expense, ExpenseForm } from "../types";
 import type { Theme } from "../themes";
 import { THEMES } from "../themes";
+import { calendarToday, formatExpenseDate, isValidISODate } from "../lib/dates";
 
 type Props = {
   T: Theme;
@@ -13,6 +14,8 @@ type Props = {
   onRemoveExpense: (id: number) => void;
   toggleSplit: (name: string) => void;
   selectAllSplit: () => void;
+  trackExpenseDates: boolean;
+  onTrackExpenseDatesChange: (value: boolean) => void;
 };
 
 export function ExpensesTab({
@@ -25,23 +28,46 @@ export function ExpensesTab({
   onRemoveExpense,
   toggleSplit,
   selectAllSplit,
+  trackExpenseDates,
+  onTrackExpenseDatesChange,
 }: Props) {
   const [formError, setFormError] = useState<string | null>(null);
 
+  const sortedExpenses = useMemo(() => {
+    const copy = [...expenses];
+    if (trackExpenseDates) {
+      copy.sort((a, b) => {
+        const da = a.date ?? "";
+        const db = b.date ?? "";
+        if (da !== db) return db.localeCompare(da);
+        return b.id - a.id;
+      });
+    } else {
+      copy.sort((a, b) => b.id - a.id);
+    }
+    return copy;
+  }, [expenses, trackExpenseDates]);
+
   const canSubmit = useMemo(() => {
     const amt = parseFloat(form.amount);
-    return (
+    const base =
       form.desc.trim().length > 0 &&
       !Number.isNaN(amt) &&
       amt > 0 &&
       form.paidBy.length > 0 &&
-      form.splitWith.length > 0
-    );
-  }, [form.amount, form.desc, form.paidBy, form.splitWith.length]);
+      form.splitWith.length > 0;
+    if (!base) return false;
+    if (trackExpenseDates && !isValidISODate(form.expenseDate)) return false;
+    return true;
+  }, [form.amount, form.desc, form.expenseDate, form.paidBy, form.splitWith.length, trackExpenseDates]);
 
   const handleAdd = () => {
     if (!canSubmit) {
-      setFormError("Add a description, positive amount, who paid, and at least one person splitting.");
+      setFormError(
+        trackExpenseDates
+          ? "Add a description, valid date, positive amount, who paid, and at least one person splitting."
+          : "Add a description, positive amount, who paid, and at least one person splitting.",
+      );
       return;
     }
     setFormError(null);
@@ -67,6 +93,68 @@ export function ExpensesTab({
           border: `0.5px solid ${T.accent}25`,
         }}
       >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            marginBottom: 14,
+            paddingBottom: 12,
+            borderBottom: `0.5px solid ${T.accent}20`,
+          }}
+        >
+          <input
+            id="track-expense-dates"
+            type="checkbox"
+            checked={trackExpenseDates}
+            onChange={(e) => {
+              const on = e.target.checked;
+              onTrackExpenseDatesChange(on);
+              if (on) {
+                setForm((f) => ({ ...f, expenseDate: isValidISODate(f.expenseDate) ? f.expenseDate : calendarToday() }));
+              }
+            }}
+            style={{ width: 18, height: 18, accentColor: T.accent, cursor: "pointer" }}
+          />
+          <label htmlFor="track-expense-dates" style={{ fontSize: 14, color: "var(--color-text-primary)", cursor: "pointer" }}>
+            Track expense dates
+          </label>
+        </div>
+
+        {trackExpenseDates && (
+          <div style={{ marginBottom: 10 }}>
+            <label
+              htmlFor="expense-date"
+              style={{
+                display: "block",
+                fontSize: 11,
+                color: "var(--color-text-secondary)",
+                marginBottom: 6,
+                textTransform: "uppercase",
+                letterSpacing: 1,
+              }}
+            >
+              Date
+            </label>
+            <input
+              id="expense-date"
+              type="date"
+              value={form.expenseDate}
+              onChange={(e) => setForm((f) => ({ ...f, expenseDate: e.target.value }))}
+              style={{
+                width: "100%",
+                maxWidth: 220,
+                padding: "8px 10px",
+                borderRadius: 8,
+                border: `0.5px solid ${T.accent}40`,
+                fontSize: 13,
+                background: "var(--color-background-primary)",
+                color: "var(--color-text-primary)",
+              }}
+            />
+          </div>
+        )}
+
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
           <input
             value={form.desc}
@@ -225,7 +313,7 @@ export function ExpensesTab({
         </div>
       )}
       <ul style={{ display: "flex", flexDirection: "column", gap: 8, listStyle: "none", margin: 0, padding: 0 }}>
-        {[...expenses].reverse().map((exp) => {
+        {sortedExpenses.map((exp) => {
           const Et = THEMES[exp.theme] ?? T;
           const emoji = exp.category?.split(" ")[0] ?? "💴";
           return (
@@ -247,6 +335,12 @@ export function ExpensesTab({
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontWeight: 500, fontSize: 14 }}>{exp.desc}</div>
                 <div style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>
+                  {trackExpenseDates && exp.date ? (
+                    <>
+                      <span>{formatExpenseDate(exp.date)}</span>
+                      <span aria-hidden> · </span>
+                    </>
+                  ) : null}
                   {exp.paidBy} · {exp.splitWith.join(", ")}
                 </div>
               </div>

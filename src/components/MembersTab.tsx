@@ -6,12 +6,21 @@ type Props = {
   members: string[];
   nameInput: string;
   setNameInput: (v: string) => void;
-  balances: Record<string, number>;
+  /** Sum of expenses each traveler paid (out-of-pocket). */
+  totalPaidByMember: Record<string, number>;
   onAdd: () => void;
   onRemove: (name: string) => void;
 };
 
-export function MembersTab({ T, members, nameInput, setNameInput, balances, onAdd, onRemove }: Props) {
+export function MembersTab({
+  T,
+  members,
+  nameInput,
+  setNameInput,
+  totalPaidByMember,
+  onAdd,
+  onRemove,
+}: Props) {
   return (
     <div>
       <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
@@ -62,9 +71,7 @@ export function MembersTab({ T, members, nameInput, setNameInput, balances, onAd
       )}
       <ul style={{ display: "flex", flexDirection: "column", gap: 8, listStyle: "none", margin: 0, padding: 0 }}>
         {members.map((m) => {
-          const b = balances[m] ?? 0;
-          const label =
-            b > 0.01 ? "owed" : b < -0.01 ? "owes" : "settled";
+          const paid = totalPaidByMember[m] ?? 0;
           return (
             <li
               key={m}
@@ -83,9 +90,12 @@ export function MembersTab({ T, members, nameInput, setNameInput, balances, onAd
                 <span style={{ fontWeight: 500, fontSize: 15 }}>{m}</span>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <span style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>
+                <span style={{ fontSize: 13, color: "var(--color-text-secondary)", textAlign: "right" }}>
+                  <span style={{ display: "block", fontSize: 11, color: "var(--color-text-tertiary)", marginBottom: 2 }}>
+                    Total paid
+                  </span>
                   {T.symbol}
-                  {Math.abs(b).toLocaleString(undefined, { maximumFractionDigits: 0 })} {label}
+                  {paid.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                 </span>
                 <button
                   type="button"
