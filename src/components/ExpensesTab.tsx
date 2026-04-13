@@ -1,11 +1,10 @@
 import { useMemo, useState } from "react";
 import type { Expense, ExpenseForm } from "../types";
-import type { Theme, ThemeKey } from "../themes";
+import type { Theme } from "../themes";
 import { THEMES } from "../themes";
 
 type Props = {
   T: Theme;
-  themeKey: ThemeKey;
   members: string[];
   expenses: Expense[];
   form: ExpenseForm;
@@ -18,7 +17,6 @@ type Props = {
 
 export function ExpensesTab({
   T,
-  themeKey,
   members,
   expenses,
   form,

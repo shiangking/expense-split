@@ -7,9 +7,11 @@ export function computeBalances(members: string[], expenses: Expense[]): Record<
     if (exp.splitWith.length === 0) continue;
     const share = exp.amount / exp.splitWith.length;
     for (const m of exp.splitWith) {
-      if (bal[m] !== undefined) bal[m] -= share;
+      const cur = bal[m];
+      if (cur !== undefined) bal[m] = cur - share;
     }
-    if (bal[exp.paidBy] !== undefined) bal[exp.paidBy] += exp.amount;
+    const paid = bal[exp.paidBy];
+    if (paid !== undefined) bal[exp.paidBy] = paid + exp.amount;
   }
   return bal;
 }
@@ -31,8 +33,11 @@ export function computeSettlements(balances: Record<string, number>): Settlement
     const [cName, cAmt] = creditors[0]!;
     const amt = Math.min(-dAmt, cAmt);
     result.push({ from: dName, to: cName, amount: amt, id: `${dName}-${cName}-${i}` });
-    b[dName] += amt;
-    b[cName] -= amt;
+    const bd = b[dName];
+    const bc = b[cName];
+    if (bd === undefined || bc === undefined) break;
+    b[dName] = bd + amt;
+    b[cName] = bc - amt;
   }
   return result;
 }
