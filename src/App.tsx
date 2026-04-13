@@ -7,10 +7,10 @@ import { defaultState, loadPersisted, savePersisted } from "./lib/persist";
 import { getSupabase, isSupabaseConfigured } from "./lib/supabase";
 import { rpcCreateSharedTrip } from "./lib/sharedTripRemote";
 import { readTripIdFromLocation, writeTripIdToUrl } from "./lib/tripUrl";
-import { totalPaidByPayer } from "./lib/totals";
+import { totalShareAfterSplit } from "./lib/totals";
 import { useSharedTripSync } from "./hooks/useSharedTripSync";
 import { ThemePicker } from "./components/ThemePicker";
-import { TripShareBar } from "./components/TripShareBar";
+import { TripShareFab } from "./components/TripShareFab";
 import { TripLanding } from "./components/TripLanding";
 import { MembersTab } from "./components/MembersTab";
 import { ExpensesTab } from "./components/ExpensesTab";
@@ -45,7 +45,7 @@ export default function App() {
 
   const sync = useSharedTripSync(sharedMode ? tripId : null, data, setData);
 
-  const { themeKey, tab, members, expenses, settledIds, trackExpenseDates } = data;
+  const { themeKey, tab, members, expenses, settledIds } = data;
   const T = THEMES[themeKey];
 
   useEffect(() => {
@@ -62,7 +62,7 @@ export default function App() {
 
   const balances = useMemo(() => computeBalances(members, expenses), [expenses, members]);
   const settlements = useMemo(() => computeSettlements(balances), [balances]);
-  const totalPaidByMember = useMemo(() => totalPaidByPayer(members, expenses), [expenses, members]);
+  const shareTotals = useMemo(() => totalShareAfterSplit(members, expenses), [expenses, members]);
 
   const settlementSignature = useMemo(
     () => settlements.map((s) => `${s.id}:${s.amount.toFixed(2)}`).join("|"),
@@ -152,6 +152,7 @@ export default function App() {
   const addExpense = () => {
     const amt = parseFloat(form.amount);
     if (!form.desc.trim() || Number.isNaN(amt) || amt <= 0 || !form.paidBy || form.splitWith.length === 0) return;
+    const expenseDate = isValidISODate(form.expenseDate) ? form.expenseDate : calendarToday();
     setData((d) => ({
       ...d,
       expenses: [
@@ -164,7 +165,7 @@ export default function App() {
           splitWith: [...form.splitWith],
           id: Date.now(),
           theme: themeKey,
-          ...(trackExpenseDates && isValidISODate(form.expenseDate) ? { date: form.expenseDate } : {}),
+          date: expenseDate,
         },
       ],
     }));
@@ -216,7 +217,7 @@ export default function App() {
       style={{
         maxWidth: 540,
         margin: "0 auto",
-        padding: "1.5rem 1rem calc(1.5rem + env(safe-area-inset-bottom))",
+        padding: `1.5rem 1rem calc(${sharedMode && tripId ? "5.5rem" : "1.5rem"} + env(safe-area-inset-bottom))`,
         fontFamily: "var(--font-sans)",
         background: T.gradient,
         minHeight: "100dvh",
@@ -254,8 +255,6 @@ export default function App() {
         </div>
         <ThemePicker current={themeKey} onChange={handleThemeChange} accent={T.accent} />
       </div>
-
-      {sharedMode && tripId && <TripShareBar T={T} tripId={tripId} sync={sync} onLeaveTrip={handleLeaveTrip} />}
 
       {(members.length > 0 || expenses.length > 0) && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 22 }}>
@@ -331,7 +330,7 @@ export default function App() {
               members={members}
               nameInput={nameInput}
               setNameInput={setNameInput}
-              totalPaidByMember={totalPaidByMember}
+              totalShareAfterSplit={shareTotals}
               onAdd={addMember}
               onRemove={removeMember}
             />
@@ -347,8 +346,6 @@ export default function App() {
               onRemoveExpense={removeExpense}
               toggleSplit={toggleSplit}
               selectAllSplit={() => setForm((f) => ({ ...f, splitWith: [...members] }))}
-              trackExpenseDates={trackExpenseDates}
-              onTrackExpenseDatesChange={(value) => setData((d) => ({ ...d, trackExpenseDates: value }))}
             />
           )}
           {tab === t && t === "settle" && (
@@ -364,6 +361,8 @@ export default function App() {
           )}
         </div>
       ))}
+
+      {sharedMode && tripId && <TripShareFab T={T} tripId={tripId} sync={sync} onLeaveTrip={handleLeaveTrip} />}
     </div>
   );
 }

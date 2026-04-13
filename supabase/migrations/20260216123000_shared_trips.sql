@@ -28,7 +28,7 @@ begin
   insert into public.shared_trips (id, state, updated_at)
   values (
     new_id,
-    '{"v":1,"themeKey":"japan","tab":"members","members":[],"expenses":[],"settledIds":[],"trackExpenseDates":false}'::jsonb,
+    '{"v":1,"themeKey":"japan","tab":"members","members":[],"expenses":[],"settledIds":[],"trackExpenseDates":true}'::jsonb,
     now()
   );
   return new_id;

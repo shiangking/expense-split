@@ -10,7 +10,7 @@ export const defaultState: PersistedState = {
   members: [],
   expenses: [],
   settledIds: [],
-  trackExpenseDates: false,
+  trackExpenseDates: true,
 };
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -63,7 +63,7 @@ export function parsePersistedStateFromJson(raw: unknown): PersistedState | null
   const settledIds = Array.isArray(parsed.settledIds)
     ? parsed.settledIds.filter((x): x is string => typeof x === "string")
     : [];
-  const trackExpenseDates = typeof parsed.trackExpenseDates === "boolean" ? parsed.trackExpenseDates : false;
+  const trackExpenseDates = true;
   return { v: 1, themeKey, tab, members, expenses, settledIds, trackExpenseDates };
 }
 

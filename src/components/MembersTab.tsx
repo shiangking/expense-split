@@ -6,8 +6,8 @@ type Props = {
   members: string[];
   nameInput: string;
   setNameInput: (v: string) => void;
-  /** Sum of expenses each traveler paid (out-of-pocket). */
-  totalPaidByMember: Record<string, number>;
+  /** Sum of each traveler's allocated share (bill ÷ splitters) across expenses they joined. */
+  totalShareAfterSplit: Record<string, number>;
   onAdd: () => void;
   onRemove: (name: string) => void;
 };
@@ -17,7 +17,7 @@ export function MembersTab({
   members,
   nameInput,
   setNameInput,
-  totalPaidByMember,
+  totalShareAfterSplit,
   onAdd,
   onRemove,
 }: Props) {
@@ -71,7 +71,7 @@ export function MembersTab({
       )}
       <ul style={{ display: "flex", flexDirection: "column", gap: 8, listStyle: "none", margin: 0, padding: 0 }}>
         {members.map((m) => {
-          const paid = totalPaidByMember[m] ?? 0;
+          const share = totalShareAfterSplit[m] ?? 0;
           return (
             <li
               key={m}
@@ -92,10 +92,10 @@ export function MembersTab({
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 <span style={{ fontSize: 13, color: "var(--color-text-secondary)", textAlign: "right" }}>
                   <span style={{ display: "block", fontSize: 11, color: "var(--color-text-tertiary)", marginBottom: 2 }}>
-                    Total paid
+                    Total spent (your split)
                   </span>
                   {T.symbol}
-                  {paid.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                  {share.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                 </span>
                 <button
                   type="button"
