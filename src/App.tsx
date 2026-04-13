@@ -5,7 +5,9 @@ import { computeBalances, computeSettlements } from "./lib/balances";
 import { calendarToday, isValidISODate } from "./lib/dates";
 import { loadPersisted, savePersisted } from "./lib/persist";
 import { totalPaidByPayer } from "./lib/totals";
+import { useSupabaseTripSync } from "./hooks/useSupabaseTripSync";
 import { ThemePicker } from "./components/ThemePicker";
+import { SyncBar } from "./components/SyncBar";
 import { MembersTab } from "./components/MembersTab";
 import { ExpensesTab } from "./components/ExpensesTab";
 import { SettleTab } from "./components/SettleTab";
@@ -30,6 +32,8 @@ export default function App() {
   const [data, setData] = useState<PersistedState>(loadPersisted);
   const [nameInput, setNameInput] = useState("");
   const [form, setForm] = useState<ExpenseForm>(() => emptyForm());
+
+  const cloud = useSupabaseTripSync(data, setData);
 
   const { themeKey, tab, members, expenses, settledIds, trackExpenseDates } = data;
   const T = THEMES[themeKey];
@@ -180,6 +184,8 @@ export default function App() {
         </div>
         <ThemePicker current={themeKey} onChange={handleThemeChange} accent={T.accent} />
       </div>
+
+      <SyncBar T={T} cloud={cloud} />
 
       {(members.length > 0 || expenses.length > 0) && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 22 }}>

@@ -3,7 +3,7 @@ import type { Expense, PersistedState, TabId } from "../types";
 
 const STORAGE_KEY = "expense-split-v1";
 
-const defaultState: PersistedState = {
+export const defaultState: PersistedState = {
   v: 1,
   themeKey: "japan",
   tab: "members",
@@ -48,24 +48,31 @@ function sanitizeExpense(raw: unknown): Expense | null {
   return date ? { ...base, date } : base;
 }
 
+/** Parse persisted trip JSON (from localStorage or Supabase). Returns null if invalid. */
+export function parsePersistedStateFromJson(raw: unknown): PersistedState | null {
+  if (!raw || typeof raw !== "object") return null;
+  const parsed = raw as Partial<PersistedState>;
+  if (parsed.v !== 1) return null;
+  const themeKey = typeof parsed.themeKey === "string" && isThemeKey(parsed.themeKey) ? parsed.themeKey : defaultState.themeKey;
+  const tab = typeof parsed.tab === "string" && isTabId(parsed.tab) ? parsed.tab : defaultState.tab;
+  const members = Array.isArray(parsed.members)
+    ? [...new Set(parsed.members.filter((m): m is string => typeof m === "string" && m.trim().length > 0).map((m) => m.trim()))]
+    : [];
+  const expensesRaw = Array.isArray(parsed.expenses) ? parsed.expenses : [];
+  const expenses = expensesRaw.map(sanitizeExpense).filter((e): e is Expense => e !== null);
+  const settledIds = Array.isArray(parsed.settledIds)
+    ? parsed.settledIds.filter((x): x is string => typeof x === "string")
+    : [];
+  const trackExpenseDates = typeof parsed.trackExpenseDates === "boolean" ? parsed.trackExpenseDates : false;
+  return { v: 1, themeKey, tab, members, expenses, settledIds, trackExpenseDates };
+}
+
 export function loadPersisted(): PersistedState {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return defaultState;
-    const parsed = JSON.parse(raw) as Partial<PersistedState>;
-    if (parsed.v !== 1) return defaultState;
-    const themeKey = typeof parsed.themeKey === "string" && isThemeKey(parsed.themeKey) ? parsed.themeKey : defaultState.themeKey;
-    const tab = typeof parsed.tab === "string" && isTabId(parsed.tab) ? parsed.tab : defaultState.tab;
-    const members = Array.isArray(parsed.members)
-      ? [...new Set(parsed.members.filter((m): m is string => typeof m === "string" && m.trim().length > 0).map((m) => m.trim()))]
-      : [];
-    const expensesRaw = Array.isArray(parsed.expenses) ? parsed.expenses : [];
-    const expenses = expensesRaw.map(sanitizeExpense).filter((e): e is Expense => e !== null);
-    const settledIds = Array.isArray(parsed.settledIds)
-      ? parsed.settledIds.filter((x): x is string => typeof x === "string")
-      : [];
-    const trackExpenseDates = typeof parsed.trackExpenseDates === "boolean" ? parsed.trackExpenseDates : false;
-    return { v: 1, themeKey, tab, members, expenses, settledIds, trackExpenseDates };
+    const parsed = JSON.parse(raw) as unknown;
+    return parsePersistedStateFromJson(parsed) ?? defaultState;
   } catch {
     return defaultState;
   }
@@ -79,4 +86,4 @@ export function savePersisted(state: PersistedState): void {
   }
 }
 
-export { STORAGE_KEY, defaultState };
+export { STORAGE_KEY };
